@@ -1,0 +1,67 @@
+# kubernetes/quantumml.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantumml-pro
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: quantumml-pro
+  strategy:
+    quantumRollingUpdate:
+      maxParallel: 1
+      minAvailable: 2
+  template:
+    metadata:
+      labels:
+        app: quantumml-pro
+    spec:
+      containers:
+      - name: quantumml
+        image: quantumml:enterprise
+        resources:
+          limits:
+            quantum/compute: 2
+            nvidia.com/gpu: 1
+            cpu: "2"
+            memory: "8Gi"
+          requests:
+            quantum/compute: 1
+        envFrom:
+        - secretRef:
+            name: quantum-secrets
+        volumeMounts:
+        - mountPath: /etc/quantum
+          name: quantum-config
+      volumes:
+      - name: quantum-config
+        configMap:
+          name: quantum-config
+---
+apiVersion: batch/v1
+kind: QuantumJob
+metadata:
+  name: quantum-training
+spec:
+  selector:
+    matchLabels:
+      job: quantum-training
+  template:
+    metadata:
+      labels:
+        job: quantum-training
+    spec:
+      containers:
+      - name: quantum-job
+        image: quantumml:enterprise
+        env:
+        - name: BACKEND
+          value: "ibmq_toronto"
+        - name: SHOTS
+          value: "10000"
+        - name: PRIORITY
+          value: "high"
+        - name: TIMEOUT
+          value: "3600"
+      restartPolicy: Never
